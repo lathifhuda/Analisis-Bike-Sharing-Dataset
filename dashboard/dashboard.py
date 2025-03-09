@@ -20,7 +20,7 @@ def create_daily_orders_df(df):
 # Load dataframe dari file yang sudah diunggah
 @st.cache_data
 def load_data():
-    return pd.read_csv("all_data.csv")
+    return pd.read_csv("dashboard/all_data.csv")
 
 data = load_data()
 
