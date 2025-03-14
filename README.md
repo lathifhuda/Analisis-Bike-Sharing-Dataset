@@ -3,8 +3,8 @@ Dashboard Bike Rentals
 
 ## Setup environment - Anaconda
 ```
-conda create --name main-ds python 3.12.3
-conda activate main-ds
+conda create --name Proyek_Analisis_Data(1)-ds python=3.9
+conda activate Proyek_Analisis_
 pip install numpy pandas scipy matplotlip seaborn streamlit babel
 ```
 ## Setup enviorment - Shell/Terminal
