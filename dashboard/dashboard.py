@@ -1,216 +1,134 @@
 import pandas as pd
+import streamlit as st
 import matplotlib.pyplot as plt
 import seaborn as sns
-import streamlit as st
-from babel.numbers import format_currency
-sns.set(style='dark')
 
-# Fungsi untuk menyiapkan daily_order_df
-def create_daily_orders_df(df):
-    daily_orders_df = df.resample(rule='D', on='dteday').agg({
-        "instant_x": "count"
-    })
-    daily_orders_df = daily_orders_df.reset_index()
-    daily_orders_df.rename(columns={
-        "instant_x": "order_count"
-    }, inplace=True)
-    
-    return daily_orders_df
-
-# Load dataframe dari file yang sudah diunggah
+# Load data
 @st.cache_data
 def load_data():
-    return pd.read_csv("dashboard/all_data.csv")
+    return pd.read_csv("main_data.csv")
 
 data = load_data()
 
-# Judul dashboard
-st.title("Dashboard Bike Rentals")
+# Convert date
+data['dteday'] = pd.to_datetime(data['dteday'])
 
-# Konversi kolom tanggal
-if 'dteday' in data.columns:
-    data['dteday'] = pd.to_datetime(data['dteday'])
-
+# Sidebar for filters
+# Determine date range
 min_date = data['dteday'].min()
 max_date = data['dteday'].max()
 
-# Sidebar untuk filter tanggal
+# Sidebar for date filter
 with st.sidebar:
     st.image("https://c8.alamy.com/comp/2NAGMWM/cartoon-illustration-of-boy-character-riding-a-bicycle-2NAGMWM.jpg")
     start_date, end_date = st.date_input(
-        label='Rentang Waktu', min_value=min_date, max_value=max_date, value=[min_date, max_date]
+        label='Date Range', 
+        min_value=min_date, 
+        max_value=max_date, 
+        value=[min_date, max_date]
     )
 
-# Filter data berdasarkan tanggal
 main_df = data[(data['dteday'] >= pd.Timestamp(start_date)) & (data['dteday'] <= pd.Timestamp(end_date))]
 
-daily_orders_df = create_daily_orders_df(main_df)
+# Daily visualization
+st.title("Bike Rental Dashboard 🚲")
 
-# Plot dengan Matplotlib
-monthly_rentals_df = pd.DataFrame({
-    "dteday": pd.date_range(start="2021-01-01", periods=12, freq="M"),
-    "total_rentals": [100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200],
-    "registered_users": [80, 150, 250, 350, 450, 550, 650, 750, 850, 950, 1050, 1150],
-    "casual_users": [20, 50, 70, 90, 110, 130, 150, 170, 190, 210, 230, 250]
-})
-
-# Pastikan dteday jadi kolom, bukan index
-monthly_rentals_df = monthly_rentals_df.reset_index(drop=True)
-
-# Pastikan kolom tanggal dalam format datetime
-data['dteday'] = pd.to_datetime(data['dteday'])
-
-# Resample data bulanan
+# Resample monthly data
 monthly_rentals_df = data.resample(rule='M', on='dteday').agg({
-    "cnt_x": "sum",              # Total penyewaan sepeda
-    "registered_x": "sum",       # Total pengguna terdaftar
-    "casual_x": "sum"            # Total pengguna kasual
+    "cnt_x": "sum",
+    "registered_x": "sum",
+    "casual_x": "sum"
 }).reset_index()
 
-# Ubah format tanggal agar lebih rapi
+# Format date
 monthly_rentals_df['dteday'] = monthly_rentals_df['dteday'].dt.strftime('%Y-%m')
 
-# Pastikan data sudah di-load dan tanggalnya benar
-data['dteday'] = pd.to_datetime(data['dteday'])
-
-# Buat daily orders dataframe
-daily_orders_df = data.groupby('dteday').agg({
-    "cnt_x": "sum",              # Total penyewaan sepeda
-    "registered_x": "sum",       # Total pengguna terdaftar
-    "casual_x": "sum"            # Total pengguna kasual
-}).reset_index()
-
-# Menghitung total rentals & revenue
-st.subheader('Daily Bike Rentals 🚲')
+# Calculate total rentals & registered users
+st.subheader('Monthly Bike Rentals 🚲')
 
 col1, col2 = st.columns(2)
 
 with col1:
-    total_orders = daily_orders_df['cnt_x'].sum()
+    total_orders = monthly_rentals_df['cnt_x'].sum()
     st.metric("Total Rentals", value=total_orders)
 
 with col2:
-    total_registered = daily_orders_df['registered_x'].sum()
+    total_registered = monthly_rentals_df['registered_x'].sum()
     st.metric("Total Registered Users", value=total_registered)
 
-# Visualisasi daily orders
+# Monthly rentals visualization
 fig, ax = plt.subplots(figsize=(16, 8))
 ax.plot(
-    daily_orders_df["dteday"],
-    daily_orders_df["cnt_x"],
+    monthly_rentals_df["dteday"],
+    monthly_rentals_df["cnt_x"],
     marker='o', 
     linewidth=2,
     color="#90CAF9"
 )
 ax.tick_params(axis='y', labelsize=20)
-ax.tick_params(axis='x', labelsize=15)
-ax.set_xlabel('Date')
+ax.tick_params(axis='x', labelsize=15, rotation=45)
+ax.set_xlabel('Month')
 ax.set_ylabel('Total Rentals')
-ax.set_title('Daily Bike Rentals')
+ax.set_title('Monthly Bike Rentals')
 
 st.pyplot(fig)
 
-# Visualisasi registered vs casual users
-st.subheader('Monthly Bike Rentals - Registered vs Casual Users 🚲')
+# Hourly rentals by season
+st.subheader("Hourly Bike Rentals by Season")
 
-if not monthly_rentals_df.empty:
-    fig, ax = plt.subplots(1, 2, figsize=(18, 6))
+fig, ax = plt.subplots(2, 2, figsize=(18, 12))
 
-    # Bar chart pengguna terdaftar
-    sns.barplot(x='dteday', y='registered_x', data=monthly_rentals_df, ax=ax[0], color='#1f77b4')
-    ax[0].set_title('Monthly Bike Rentals - Registered Users')
-    ax[0].set_xlabel('Month')
-    ax[0].set_ylabel('Total Rentals')
-    ax[0].tick_params(axis='x', rotation=45)
+seasons = {
+    1: "Winter",
+    2: "Spring",
+    3: "Summer",
+    4: "Fall"
+}
 
-    # Bar chart pengguna kasual
-    sns.barplot(x='dteday', y='casual_x', data=monthly_rentals_df, ax=ax[1], color='#ff7f0e')
-    ax[1].set_title('Monthly Bike Rentals - Casual Users')
-    ax[1].set_xlabel('Month')
-    ax[1].set_ylabel('Total Rentals')
-    ax[1].tick_params(axis='x', rotation=45)
+for i, (season, name) in enumerate(seasons.items()):
+    row, col = divmod(i, 2)
+    season_df = main_df[main_df['season_x'] == season]
 
-    plt.tight_layout()
-    st.pyplot(fig)
-else:
-    st.warning("Data tidak tersedia untuk rentang tanggal yang dipilih. Silakan pilih rentang lain.")
+    sns.barplot(x='hr', y='cnt_y', data=season_df, ax=ax[row, col], color='#1f77b4')
+    ax[row, col].set_title(f'Hourly Bike Rentals in {name}')
+    ax[row, col].set_xlabel('Hour of Day')
+    ax[row, col].set_ylabel('Total Rentals')
+    ax[row, col].tick_params(axis='x', rotation=45)
 
+plt.tight_layout()
+st.pyplot(fig)
 
-st.subheader("Best Customer Based on RFM Parameters 🚲")
+# Manual Grouping for Rental Categories
+main_df['rental_category'] = pd.cut(main_df['cnt_x'], bins=[0, 1000, 4000, main_df['cnt_x'].max()],
+                                    labels=['Low', 'Medium', 'High'])
 
-# Fungsi untuk membuat RFM DataFrame
-def create_rfm_df(df):
-    if df.empty:
-        return pd.DataFrame()  # Kalau data kosong, balikin dataframe kosong
+# Grouping Data for Visualization
 
-    snapshot_date = df['dteday'].max() + pd.Timedelta(days=1)
+grouped_day_df = main_df.groupby(['season_x', 'rental_category']).size().reset_index(name='count')
 
-    rfm_df = df.groupby('registered_x').agg(
-        recency=('dteday', lambda x: (snapshot_date - x.max()).days),
-        frequency=('instant_x', 'count'),
-        monetary=('cnt_x', 'sum')
-    ).reset_index()
+main_df['time_of_day'] = pd.cut(main_df['hr'], bins=[0, 6, 12, 18, 24],
+                                labels=['Early Morning', 'Morning', 'Afternoon', 'Evening'], right=False)
 
-    return rfm_df
+grouped_hour_df = main_df.groupby(['season_x', 'time_of_day']).size().reset_index(name='count')
 
-# Buat RFM hanya kalau ada data yang lolos filter
-if not main_df.empty:
-    rfm_df = create_rfm_df(main_df)
+# Visualization
+st.title("Advanced Analysis with Manual Grouping")
 
-    if not rfm_df.empty:
-        st.success("Data RFM berhasil dibuat! 🚀")
+st.subheader("Bike Rental Categories by Season")
+fig, ax = plt.subplots(figsize=(12, 6))
+sns.barplot(x='season_x', y='count', hue='rental_category', data=grouped_day_df, palette='viridis')
+ax.set_xlabel('Season')
+ax.set_ylabel('Number of Days')
+plt.title('Bike Rental Categories by Season')
+st.pyplot(fig)
 
-        col1, col2, col3 = st.columns(3)
+st.subheader("Bike Rental Patterns by Time of Day")
+fig, ax = plt.subplots(figsize=(12, 6))
+sns.barplot(x='season_x', y='count', hue='time_of_day', data=grouped_hour_df, palette='coolwarm')
+ax.set_xlabel('Season')
+ax.set_ylabel('Number of Rentals')
+plt.title('Bike Rental Patterns by Time of Day (Based on Season)')
+st.pyplot(fig)
 
-        with col1:
-            avg_recency = round(rfm_df['recency'].mean(), 1)
-            st.metric("Average Recency (days)", value=avg_recency)
+st.success("Dashboard is ready to run in Streamlit! 🚀")
 
-        with col2:
-            avg_frequency = round(rfm_df['frequency'].mean(), 2)
-            st.metric("Average Frequency", value=avg_frequency)
-
-        with col3:
-            avg_monetary = round(rfm_df['monetary'].mean(), 2)
-            st.metric("Average Monetary", value=f"${avg_monetary}")
-
-        # Visualisasi RFM pakai bar chart
-        fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(35, 15))
-        colors = ["#90CAF9"] * 5
-
-        # Recency Chart
-        sns.barplot(y="recency", x="registered_x", data=rfm_df.sort_values(by="recency", ascending=True).head(5), palette=colors, ax=ax[0])
-        ax[0].set_ylabel(None)
-        ax[0].set_xlabel("User ID", fontsize=30)
-        ax[0].set_title("By Recency (days)", loc="center", fontsize=50)
-        ax[0].tick_params(axis='y', labelsize=30)
-        ax[0].tick_params(axis='x', labelsize=35)
-
-        # Frequency Chart
-        sns.barplot(y="frequency", x="registered_x", data=rfm_df.sort_values(by="frequency", ascending=False).head(5), palette=colors, ax=ax[1])
-        ax[1].set_ylabel(None)
-        ax[1].set_xlabel("User ID", fontsize=30)
-        ax[1].set_title("By Frequency", loc="center", fontsize=50)
-        ax[1].tick_params(axis='y', labelsize=30)
-        ax[1].tick_params(axis='x', labelsize=35)
-
-        # Monetary Chart
-        sns.barplot(y="monetary", x="registered_x", data=rfm_df.sort_values(by="monetary", ascending=False).head(5), palette=colors, ax=ax[2])
-        ax[2].set_ylabel(None)
-        ax[2].set_xlabel("User ID", fontsize=30)
-        ax[2].set_title("By Monetary", loc="center", fontsize=50)
-        ax[2].tick_params(axis='y', labelsize=30)
-        ax[2].tick_params(axis='x', labelsize=35)
-
-        # Tampilkan plot di Streamlit
-        st.pyplot(fig)
-
-    else:
-        st.warning("Data RFM kosong setelah difilter. Coba pilih rentang tanggal atau kategori lain! 🟠")
-else:
-    st.warning("Data utama kosong setelah filter. Pastikan ada data yang sesuai filter! 🟠")
-
-
-
-
-# Jalankan dengan: streamlit run nama_file.py
