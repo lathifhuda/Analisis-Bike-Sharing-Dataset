@@ -35,7 +35,7 @@ st.title("Bike Rental Dashboard 🚲")
 
 # Resample monthly data
 data = {
-    'dteday': pd.date_range(start='1/1/2023', periods=12, freq='M'),
+    'dteday': pd.date_range(start='1/1/2011', periods=12, freq='M'),
     'total_rentals': [5000, 7000, 8000, 6000, 9000, 11000, 13000, 12000, 10000, 9500, 8500, 9200],
     'registered_users': [4000, 5000, 6000, 4500, 7000, 9000, 10000, 9500, 8000, 7800, 7200, 7700],
     'casual_users': [1000, 2000, 2000, 1500, 2000, 2000, 3000, 2500, 2000, 1700, 1300, 1500]
