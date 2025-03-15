@@ -6,7 +6,7 @@ import seaborn as sns
 # Load data
 @st.cache_data
 def load_data():
-    return pd.read_csv("dashboard/main_data.csv")
+    return pd.read_csv("main_data.csv")
 
 data = load_data()
 
@@ -34,43 +34,70 @@ main_df = data[(data['dteday'] >= pd.Timestamp(start_date)) & (data['dteday'] <=
 st.title("Bike Rental Dashboard 🚲")
 
 # Resample monthly data
-data = {
-    'dteday': pd.date_range(start='1/1/2011', periods=12, freq='M'),
-    'total_rentals': [5000, 7000, 8000, 6000, 9000, 11000, 13000, 12000, 10000, 9500, 8500, 9200],
-    'registered_users': [4000, 5000, 6000, 4500, 7000, 9000, 10000, 9500, 8000, 7800, 7200, 7700],
-    'casual_users': [1000, 2000, 2000, 1500, 2000, 2000, 3000, 2500, 2000, 1700, 1300, 1500]
-}
-monthly_rentals_df = pd.DataFrame(data)
+monthly_rentals_df = data.resample(rule='M', on='dteday').agg({
+    "cnt_x": "sum",
+    "registered_x": "sum",
+    "casual_x": "sum"
+}).reset_index()
+ 
+# Format date
+monthly_rentals_df['dteday'] = monthly_rentals_df['dteday'].dt.strftime('%Y-%m')
 
-# Title
-st.subheader("📊 Monthly Bike Rentals")
+# Calculate total rentals & registered users
+st.subheader('Monthly Bike Rentals 🚲')
+
 col1, col2 = st.columns(2)
 
 with col1:
-    total_orders = monthly_rentals_df['total_rentals'].sum()
+    total_orders = monthly_rentals_df['cnt_x'].sum()
     st.metric("Total Rentals", value=total_orders)
 
 with col2:
-    total_registered = monthly_rentals_df['registered_users'].sum()
+    total_registered = monthly_rentals_df['registered_x'].sum()
     st.metric("Total Registered Users", value=total_registered)
 
-# Convert Date to String for Display
-monthly_rentals_df['dteday'] = monthly_rentals_df['dteday'].dt.strftime('%Y-%m')
+# Monthly rentals visualization
+fig, ax = plt.subplots(figsize=(16, 8))
 
-# Plotting
-fig, ax = plt.subplots(figsize=(10, 5))
-ax.plot(monthly_rentals_df['dteday'], monthly_rentals_df['total_rentals'], label='Total Rentals', marker='o')
-ax.plot(monthly_rentals_df['dteday'], monthly_rentals_df['registered_users'], label='Registered Users', marker='s')
-ax.plot(monthly_rentals_df['dteday'], monthly_rentals_df['casual_users'], label='Casual Users', marker='^')
+# Total Rentals
+ax.plot(
+    monthly_rentals_df["dteday"], 
+    monthly_rentals_df["cnt_x"], 
+    marker='o', 
+    linewidth=3, 
+    color="#1976D2", 
+    label="Total Rentals"
+)
 
-ax.set_xlabel('Month')
-ax.set_ylabel('Number of Rentals')
-ax.set_title('Monthly Bike Rentals')
-ax.set_xticklabels(monthly_rentals_df['dteday'], rotation=45)
-ax.legend()
+# Registered Users
+ax.plot(
+    monthly_rentals_df["dteday"], 
+    monthly_rentals_df["registered_x"], 
+    marker='s', 
+    linewidth=2, 
+    color="#FF9800", 
+    label="Registered Users"
+)
+
+# Casual Users
+ax.plot(
+    monthly_rentals_df["dteday"], 
+    monthly_rentals_df["casual_x"], 
+    marker='^', 
+    linewidth=2, 
+    color="#4CAF50", 
+    label="Casual Users"
+)
+
+# Formatting
+ax.tick_params(axis='y', labelsize=20)
+ax.tick_params(axis='x', labelsize=15, rotation=45)
+ax.set_xlabel('Month', fontsize=15)
+ax.set_ylabel('Number of Rentals', fontsize=15)
+ax.set_title('Monthly Bike Rentals', fontsize=18)
+ax.legend(fontsize=12)
 ax.grid()
 
-# Show Plot in Streamlit
 st.pyplot(fig)
 
 # Hourly rentals by season
